@@ -1,3 +1,8 @@
+# My notes
+
+Make sure stack name doesnt start with aws, ecs, or fargate.
+Make sure that if youre compiling the docker image on m1 you use ARM/Linux runtime environment for task
+
 
 # Welcome to your CDK Python project!
 

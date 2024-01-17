@@ -1,61 +1,63 @@
 from aws_cdk import (
     Stack,
+    aws_ec2 as ec2,
     aws_ecs as ecs,
-    aws_ec2 as ec2
+    aws_ecr as ecr,
+    aws_ecs_patterns as ecs_patterns,
+    aws_elasticloadbalancingv2 as elb_v2,
+    aws_certificatemanager as cert_manager,
+    aws_route53 as r53,
 )
-
 from constructs import Construct
 
+class FlaskStack(Stack):
 
-class EcsStack(Stack):
+    def __init__(self, scope: Construct, construct_id: str, **kwargs) -> None:
+        super().__init__(scope, construct_id, **kwargs)
 
-    def __init__(self, scope: Construct, id: str, **kwargs) -> None:
-        super().__init__(scope, id, **kwargs)
+        # Retrieve VPC information
+        vpc = ec2.Vpc.from_lookup(
+            self, 'VPC',
+            # This imports the default VPC but you can also
+            # specify a 'vpcName' or 'tags'.
+            is_default=True)
 
-        vpc = ec2.Vpc(self, "flask-app-vpc", max_azs=2)
+        # ECS cluster
+        cluster = ecs.Cluster(self, 'MyCluster', vpc=vpc)
 
-        cluster = ecs.Cluster(self, "flask-app-cluster", vpc=vpc)
+        # SSL Certificate (replace with your certificate arn)
+        # certificate_arn = 'arn:aws:acm:REGION:ACCOUNT:certificate/CERTIFICATE'
 
-        cluster.add_capacity(
-            "DefaultAutoScalingGroup",
-            instance_type=ec2.InstanceType("t2.micro"),
-            desired_capacity=1
-        )
 
-        task_definition = ecs.Ec2TaskDefinition(
-            self, "flask-app-task",
-            network_mode=ecs.NetworkMode.AWS_VPC,
-        )
+        repository = ecr.Repository(self, "flask-app")
 
-        web_container = task_definition.add_container(
-            "flask-app-container",
-            image=ecs.ContainerImage.from_registry("flask-hello-world:latest"),
-            cpu=100,
-            memory_limit_mib=256,
-            essential=True
-        )
 
-        port_mapping = ecs.PortMapping(
-            container_port=5000,
-            protocol=ecs.Protocol.TCP
-        )
-
-        web_container.add_port_mappings(port_mapping)
-
-        security_group = ec2.SecurityGroup(
-            self, "flask-app-scurity-group-1093827",
-            vpc=vpc,
-            allow_all_outbound=True
-        )
-
-        security_group.add_ingress_rule(
-            ec2.Peer.any_ipv4(),
-            ec2.Port.tcp(5000),
-        )
-
-        service = ecs.Ec2Service(
-            self, "flask-app-service",
+        # Use ALB + Fargate from ECS patterns
+        service = ecs_patterns.ApplicationLoadBalancedFargateService(
+            self, 'MyFlaskApiWithFargate',
             cluster=cluster,
-            task_definition=task_definition,
-            security_groups=[security_group]
-        )
+            cpu=512,
+            memory_limit_mib=1024,
+            desired_count=1,
+            assign_public_ip=True,
+            # Container image
+            task_image_options=ecs_patterns.ApplicationLoadBalancedTaskImageOptions(
+                #image=ecs.ContainerImage.from_registry("public.ecr.aws/u5o1f2o6/test-flask-app:latest"),
+                image=ecs.ContainerImage.from_asset("../flask_app"),
+                container_port=5000),
+            # Setting this to ARM64/Linux since this is how the container is built
+            runtime_platform=ecs.RuntimePlatform(
+                cpu_architecture=ecs.CpuArchitecture.ARM64,
+                operating_system_family=ecs.OperatingSystemFamily.LINUX
+            ),
+            # Routing
+            public_load_balancer=True,
+            protocol=elb_v2.ApplicationProtocol.HTTP,
+            #redirect_http=True,
+            # certificate=cert_manager.Certificate.from_certificate_arn(self, 'cert', certificate_arn),
+            # Replace with your domain
+            #domain_name='cdk-flask-api.example.com.',
+            #domain_zone=r53.HostedZone.from_lookup(self, "MyHostedZone", domain_name="example.com.")
+            )
+
+        service.target_group.configure_health_check(path='/health')

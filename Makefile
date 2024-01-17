@@ -1,10 +1,8 @@
 build:
-	@docker build -t flask-hello-world .
+	@docker build -t flask-app flask_app
 
 run:
-	@docker run --rm -it -p 5000:5000 flask-hello-world
+	@docker run --rm -it -p 5000:5000 flask-app
 
-push:
-	@aws ecr get-login-password --region us-east-2 | docker login --username AWS --password-stdin 202571202047.dkr.ecr.us-east-2.amazonaws.com
-	@docker tag flask-hello-world:latest 202571202047.dkr.ecr.us-east-2.amazonaws.com/flask-hello-world:latest
-	@docker push 202571202047.dkr.ecr.us-east-2.amazonaws.com/flask-hello-world:latest
+dump-deps:
+	@poetry export --without-hashes --format=requirements.txt > flask_app/requirements.txt
