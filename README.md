@@ -1,5 +1,13 @@
 # Flask Application Load Balanced Project
 
+Setup:
+- install poetry
+- make build
+- make tar
+- run cdk stuff
+
+# My notes
+
 - Make sure stack name doesnt start with aws, ecs, or fargate.
 - Make sure that if youre compiling the docker image on m1 you use ARM/Linux runtime environment for task
 - Image is being pushed from "asset" where it builds locally and deploys the container. Not from ecr. Couldnt figure out permission to pull from ecr
@@ -11,12 +19,10 @@
 - When seeing an error like this `fail: No ECR repository named 'cdk-hnb659fds-container-assets-202571202047-us-east-2' in account 202571202047. Is this account bootstrapped?` can try delete cloudformation cdk stack and cdk s3 buckets then performing a boostrap again. Someone recommended cdk bootstrap --force but that didnt work
 
 ## TODO
-slim down cdk folder
 make file commands for cdk?
 build from asset not from tarball
 certs
 domain name
-print domain name after deployment
 
 ## CDK Ccommands
 
