@@ -2,13 +2,14 @@ from aws_cdk import (
     Stack,
     aws_ec2 as ec2,
     aws_ecs as ecs,
-    aws_ecr as ecr,
     aws_ecs_patterns as ecs_patterns,
     aws_elasticloadbalancingv2 as elb_v2,
     aws_certificatemanager as cert_manager,
     aws_route53 as r53,
+    CfnOutput
 )
 from constructs import Construct
+import os
 
 class FlaskStack(Stack):
 
@@ -29,8 +30,7 @@ class FlaskStack(Stack):
         # certificate_arn = 'arn:aws:acm:REGION:ACCOUNT:certificate/CERTIFICATE'
 
 
-        repository = ecr.Repository(self, "flask-app")
-
+        tar_path = os.path.join(os.path.dirname(__file__), '../../image-target/flask-app-hello-world.tar')
 
         # Use ALB + Fargate from ECS patterns
         service = ecs_patterns.ApplicationLoadBalancedFargateService(
@@ -42,8 +42,8 @@ class FlaskStack(Stack):
             assign_public_ip=True,
             # Container image
             task_image_options=ecs_patterns.ApplicationLoadBalancedTaskImageOptions(
-                #image=ecs.ContainerImage.from_registry("public.ecr.aws/u5o1f2o6/test-flask-app:latest"),
-                image=ecs.ContainerImage.from_asset("../flask_app"),
+                # use GLOB pattern matching to exclude cdk folder
+                image=ecs.ContainerImage.from_tarball(tar_path),
                 container_port=5000),
             # Setting this to ARM64/Linux since this is how the container is built
             runtime_platform=ecs.RuntimePlatform(
@@ -61,3 +61,9 @@ class FlaskStack(Stack):
             )
 
         service.target_group.configure_health_check(path='/health')
+
+        # Output the DNS where you can access your service
+        CfnOutput(
+            self, "LoadBalancerDNS",
+            value=service.load_balancer.load_balancer_dns_name
+        )
